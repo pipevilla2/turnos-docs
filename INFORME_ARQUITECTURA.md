@@ -47,6 +47,53 @@ depende de nada. Esto permite:
 | **Background Worker (Hosted Service)** | `ExpiracionTurnosService` | Expira turnos vencidos de forma proactiva (cada 30s), garantizando la regla de los 15 minutos incluso si nadie vuelve a consultar el turno. |
 | **DTO / Anti-Corruption Layer** | `Turnos.Application.DTOs` | La API nunca expone las entidades de dominio directamente; controla qué información sale y desacopla el contrato REST de la persistencia. |
 
+### 2.3 Frontend — Angular por funcionalidades
+
+El frontend utiliza una arquitectura **feature-based** con **Standalone
+Components**, sin `NgModules`. Las funcionalidades se agrupan por pantalla y
+las responsabilidades compartidas se concentran en `core`:
+
+```text
+src/app/
+├── core/
+│   ├── guards/          (protección de rutas)
+│   ├── interceptors/    (JWT en peticiones HTTP)
+│   ├── models/          (modelos TypeScript)
+│   └── services/        (AuthService, TurnoService, SucursalService)
+└── features/
+    ├── login/
+    ├── agendar-turno/
+    ├── lista-turnos/
+    └── turno-detalle/
+```
+
+Cada funcionalidad representa una pantalla y mantiene su lógica TypeScript y
+su plantilla HTML separadas. Las rutas utilizan `loadComponent` para cargar
+los componentes bajo demanda, reduciendo el bundle inicial.
+
+#### Convenciones de nombres del frontend
+
+- Archivos y carpetas en **kebab-case**: `agendar-turno` y
+  `agendar-turno.component.ts`.
+- Clases en **PascalCase**: `AgendarTurnoComponent` y `TurnoService`.
+- Selectores de componentes con el prefijo `app-`: `app-agendar-turno`.
+- Servicios con el sufijo `.service.ts`, guards con `.guard.ts` e
+  interceptores con `.interceptor.ts`.
+- Las pruebas se nombran con el sufijo `.spec.ts` y se ubican junto al código
+  que validan.
+
+Ejemplo de carga diferida:
+
+```typescript
+{
+  path: 'agendar',
+  canActivate: [authGuard],
+  loadComponent: () =>
+    import('./features/agendar-turno/agendar-turno.component')
+      .then(m => m.AgendarTurnoComponent)
+}
+```
+
 ## 3. Modelo de datos
 
 ### Motor de base de datos
@@ -79,7 +126,9 @@ turnos pendientes vencidos.
 |---|---|
 | Límite de 15 minutos para activar | `Turno.Crear` fija `FechaHoraExpiracion = ahora + 15min`; `Turno.Activar` valida el tiempo y lanza `TurnoExpiradoException` si ya venció. |
 | Expiración automática | `ExpiracionTurnosService` (BackgroundService) + `Turno.IntentarExpirar`, corre cada 30s. |
-| Máximo 5 turnos/día por cédula | `TurnoService.CrearTurnoAsync` consulta `CountByCedulaOnDateAsync` (turnos no cancelados del día) antes de crear; si es ≥5 lanza `LimiteTurnosDiariosException` (HTTP 409). El contador se reinicia naturalmente al cambiar de día porque el filtro usa el rango `[hoy 00:00, mañana 00:00)`. |
+| Máximo 5 turnos/día por cédula | `TurnoService.CrearTurnoAsync` consulta `CountByCedulaBetweenAsync` (turnos no cancelados del día colombiano) antes de crear; si es ≥5 lanza `LimiteTurnosDiariosException` (HTTP 409). El contador se reinicia naturalmente al cambiar de día porque el filtro usa el rango `[hoy 00:00, mañana 00:00)` de Colombia. |
+| Fecha y hora de negocio | `ColombiaClock` genera la hora local de Colombia para creación, expiración y activación. El backend compara todas las fechas de turnos con el mismo reloj para evitar diferencias de zona horaria. |
+| Código consecutivo del turno | `TurnoService` cuenta los turnos de la sucursal en el día colombiano mediante `CountBySucursalBetweenAsync`, generando una secuencia independiente de la cédula. |
 | Reintentar tras expirar | El cliente simplemente vuelve a llamar `POST /api/turnos`; como el turno expirado no cuenta distinto de uno vigente, solo se bloquea si ya llegó a 5 turnos "vivos" (no cancelados) ese día — incluyendo expirados, que sí cuentan como intento, tal como lo especifica el enunciado ("más de 5 turnos solicitados en el día"). |
 | Solo sucursales activas | Se valida `Sucursal.Activa` en `CrearTurnoAsync`. |
 
