@@ -115,16 +115,71 @@ aplicación no queda acoplada a un motor concreto: migrar a otro proveedor
 configuración del `DbContext` y la cadena de conexión; las entidades,
 repositorios, servicios y reglas de negocio permanecen iguales.
 
-**Sucursal**: Id, Nombre, Dirección, Ciudad, Activa.
+La base de datos se llama **`dbturnos`** y contiene tres tablas, todas
+mapeadas por Entity Framework Core a partir de las entidades de
+`Turnos.Domain` (ver `TurnosDbContext.OnModelCreating`).
 
-**Turno**: Id (GUID), CodigoTurno, Cédula, SucursalId (FK), FechaHoraCreación,
-FechaHoraExpiración (Creación + 15 min), FechaHoraActivación (nullable),
-Estado (`Pendiente`, `Activado`, `Atendido`, `Expirado`, `Cancelado`).
+### 3.1 Tabla `Sucursales`
 
-Se agregaron índices compuestos `(Cedula, FechaHoraCreacion)` y
-`(Estado, FechaHoraExpiracion)` porque son exactamente los filtros usados por
-las dos consultas más frecuentes: contar turnos del día por cédula y barrer
-turnos pendientes vencidos.
+Guarda las sucursales físicas donde un cliente puede ser atendido.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `Id` | int | PK, autoincremental | Identificador de la sucursal. |
+| `Nombre` | varchar(150) | requerido | Nombre visible de la sucursal. |
+| `Direccion` | varchar(250) | requerido | Dirección física. |
+| `Ciudad` | varchar(100) | requerido | Ciudad donde está ubicada. |
+| `Activa` | bit | requerido, default `true` | Solo las sucursales activas permiten crear turnos nuevos. |
+
+### 3.2 Tabla `Turnos`
+
+Es la tabla central del sistema: cada fila es un turno solicitado por un
+cliente para una sucursal específica.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `Id` | uniqueidentifier (GUID) | PK | Identificador único del turno, generado en el servidor al crearlo. |
+| `CodigoTurno` | varchar(30) | único, requerido | Código consecutivo legible que se le muestra al cliente y al empleado (ej. sucursal + número). |
+| `Cedula` | varchar(20) | requerido | Cédula del cliente dueño del turno. |
+| `SucursalId` | int | FK a `Sucursales.Id` | Sucursal donde se atenderá el turno. |
+| `FechaHoraCreacion` | datetime | requerido | Momento (hora Colombia) en que se solicitó el turno. |
+| `FechaHoraExpiracion` | datetime | requerido | `FechaHoraCreacion` + 15 minutos; límite para activarlo. |
+| `FechaHoraActivacion` | datetime | opcional (nullable) | Se llena solo cuando el cliente activa el turno al llegar a la sucursal. |
+| `Estado` | varchar(20) | requerido, guardado como texto | Uno de: `Pendiente`, `Activado`, `Atendido`, `Expirado`, `Cancelado`. |
+
+Se guarda el estado como texto (`Pendiente`, `Activado`, etc.) en lugar de un
+número, para que la tabla se pueda leer e inspeccionar directamente en la
+base de datos sin necesidad de recordar a qué número corresponde cada estado.
+
+**Relación**: `Turnos.SucursalId` → `Sucursales.Id` (muchos turnos pertenecen
+a una sucursal). El borrado está restringido (`DeleteBehavior.Restrict`): no
+se puede eliminar una sucursal que ya tenga turnos asociados, para no perder
+el historial.
+
+**Índices**:
+
+- `UX_Turnos_CodigoTurno` (único) sobre `CodigoTurno`: evita a nivel de base
+  de datos que existan dos turnos con el mismo código, incluso si algo fallara
+  en la generación del consecutivo.
+- `(Cedula, FechaHoraCreacion)`: acelera la consulta que cuenta cuántos turnos
+  ha pedido una cédula en el día (regla de máximo 5 turnos diarios).
+- `(Estado, FechaHoraExpiracion)`: acelera el barrido periódico que busca
+  turnos `Pendiente` ya vencidos para expirarlos.
+
+### 3.3 Tabla `TurnosConsecutivos`
+
+Tabla de apoyo, con una sola fila por sucursal, que lleva el último número de
+turno asignado en esa sucursal.
+
+| Columna | Tipo | Restricciones | Descripción |
+|---|---|---|---|
+| `SucursalId` | int | PK | Sucursal a la que pertenece el contador. |
+| `UltimoConsecutivo` | int | requerido | Último número de turno entregado en esa sucursal. |
+
+Esta tabla existe para poder incrementar el consecutivo de forma atómica
+(`MERGE ... WITH (HOLDLOCK)`, ver sección 6) sin tener que calcularlo leyendo
+y contando los turnos existentes, lo cual sería lento y además propenso a
+duplicados si dos clientes piden turno al mismo tiempo.
 
 ## 4. Reglas de negocio y dónde se implementan
 
