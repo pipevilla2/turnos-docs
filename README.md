@@ -93,6 +93,7 @@ npm install
 
 ```bash
 npm start
+ng serve -o
 ```
 
 La aplicación queda disponible en `http://localhost:4200`.
