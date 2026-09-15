@@ -33,6 +33,14 @@ usar directamente, sin necesidad de instalar nada localmente:
 - Acceso a la base de datos de pruebas: servidor **Azure SQL** `myservidorpruebas`,
   base de datos `dbturnos` (la contraseña se proporciona aparte)
 
+## Alcance de la validación de clientes
+
+Por el alcance definido para esta prueba técnica, la validación del cliente se
+realiza únicamente mediante su número de cédula. No se implementaron registro
+de usuarios, recuperación de contraseña ni gestión completa de cuentas. En un
+entorno productivo, este flujo podría ampliarse con un sistema de identidad y
+autenticación más robusto.
+
 ## 1. Backend (`turnos-backend`)
 
 ### 1.1 Configuración previa
