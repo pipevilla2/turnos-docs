@@ -18,6 +18,9 @@ y debe leerse junto con el `.md`.
 
 ## Demo desplegada en Azure
 
+✅ **La demo desplegada en Azure está completamente funcionando** y se puede
+usar directamente, sin necesidad de instalar nada localmente:
+
 - **Frontend (Azure Static Web App)**: https://gray-field-03d5bbe0f.3.azurestaticapps.net/login
 - **Backend (Azure App Service - Swagger)**: https://turnos-backend-hpgygthvgpcdcbbf.westus3-01.azurewebsites.net/swagger/index.html
 
@@ -33,17 +36,10 @@ y debe leerse junto con el `.md`.
 
 ### 1.1 Configuración previa
 
-1. Ubicar el archivo `src/Turnos.Api/appsettings.json` (o
-   `appsettings.Development.json` para desarrollo local) y actualizar:
-   - `ConnectionStrings:Default`: cadena de conexión al servidor Azure SQL de
-     pruebas `myservidorpruebas`, base de datos `dbturnos` (la contraseña se
-     proporciona por separado), por ejemplo:
-     `Server=tcp:myservidorpruebas.database.windows.net,1433;Initial Catalog=dbturnos;User ID=myservidorpruebas;Password=<proporcionada>;Encrypt=True;`
-
-   > **Nota de seguridad**: no dejes credenciales reales de base de datos ni
-   > llaves JWT en `appsettings.json` dentro del repositorio. Para uso local
-   > usa `dotnet user-secrets`, y en producción usa variables de entorno o un
-   > vault (Azure Key Vault, etc.).
+1. El archivo `src/Turnos.Api/appsettings.json` ya trae configurada la
+   cadena de conexión (`ConnectionStrings:Default`) al servidor Azure SQL de
+   pruebas `myservidorpruebas`, base de datos `dbturnos`. No es necesario
+   cambiar nada: el servidor es solo de pruebas y ya está listo para usarse.
 
 2. La base de datos de pruebas (`dbturnos`) ya está creada en Azure SQL con
    sus tablas y datos por defecto. El script de creación se encuentra en
@@ -81,6 +77,11 @@ La API queda disponible en la URL indicada en consola (por defecto algo como
    URL donde esté corriendo el backend (por defecto
    `https://localhost:7150/api` en desarrollo).
 
+   > **Importante**: para que el frontend corra localmente y apunte al
+   > backend local (en vez del backend desplegado en Azure), debes cambiar
+   > `apiUrl` en `environment.ts` a la URL local del backend
+   > (`https://localhost:7150/api`).
+
 ### 2.2 Instalar dependencias
 
 ```bash
@@ -114,13 +115,10 @@ desplegar en Azure Static Web Apps u otro hosting estático.
 
 ## 3. Orden recomendado de ejecución local
 
-1. Configurar la cadena de conexión del backend con los datos del servidor de
-   pruebas en Azure SQL (`myservidorpruebas` / base de datos `dbturnos`,
-   contraseña proporcionada aparte).
-2. Ejecutar el backend (`dotnet run`) y confirmar que responde en Swagger.
-3. Actualizar `environment.ts` del frontend con la URL del backend si difiere
+1. Ejecutar el backend (`dotnet run`) y confirmar que responde en Swagger.
+2. Actualizar `environment.ts` del frontend con la URL del backend si difiere
    de la URL por defecto.
-4. Ejecutar el frontend (`npm start`) y acceder a `http://localhost:4200`.
+3. Ejecutar el frontend (`npm start`) y acceder a `http://localhost:4200`.
 
 ## 4. Documentación adicional
 
