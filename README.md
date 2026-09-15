@@ -3,15 +3,18 @@
 Prueba técnica: sistema de agendamiento de turnos bancarios compuesto por un
 backend en **ASP.NET Core 8 Web API** (`turnos-backend`) y un frontend en
 **Angular 18** (`turnos-frontend`), documentados en detalle en
-[`INFORME_ARQUITECTURA.md`](./INFORME_ARQUITECTURA.md).
+[`INFORME_ARQUITECTURA.md`](./INFORME_ARQUITECTURA.md). Para ver las
+gráficas de la arquitectura, revisa
+[`INFORME_ARQUITECTURA.pdf`](./INFORME_ARQUITECTURA.pdf), que sí las incluye
+y debe leerse junto con el `.md`.
 
 ## Repositorios / carpetas del proyecto
 
-| Carpeta | Contenido |
-|---|---|
-| `turnos-backend` | API REST en .NET 8 (Clean Architecture) |
-| `turnos-frontend` | SPA en Angular 18 |
-| `turnos-docs` | Documentación del proyecto (este archivo, informe de arquitectura, etc.) |
+| Carpeta | Contenido | Repositorio en GitHub |
+|---|---|---|
+| `turnos-backend` | API REST en .NET 8 (Clean Architecture) | https://github.com/pipevilla2/turnos-backend |
+| `turnos-frontend` | SPA en Angular 18 | https://github.com/pipevilla2/turnos-frontend |
+| `turnos-docs` | Documentación del proyecto (este archivo, informe de arquitectura, etc.) | https://github.com/pipevilla2/turnos-docs |
 
 ## Demo desplegada en Azure
 
@@ -23,7 +26,8 @@ backend en **ASP.NET Core 8 Web API** (`turnos-backend`) y un frontend en
 - [.NET SDK 8.0](https://dotnet.microsoft.com/download) o superior
 - [Node.js 18+](https://nodejs.org/) y npm
 - [Angular CLI 18](https://angular.dev/tools/cli) (`npm install -g @angular/cli`)
-- Acceso a una base de datos **SQL Server** (local, Docker o Azure SQL)
+- Acceso a la base de datos de pruebas: servidor **Azure SQL** `myservidorpruebas`,
+  base de datos `dbturnos` (la contraseña se proporciona aparte)
 
 ## 1. Backend (`turnos-backend`)
 
@@ -31,22 +35,20 @@ backend en **ASP.NET Core 8 Web API** (`turnos-backend`) y un frontend en
 
 1. Ubicar el archivo `src/Turnos.Api/appsettings.json` (o
    `appsettings.Development.json` para desarrollo local) y actualizar:
-   - `ConnectionStrings:Default`: cadena de conexión a tu instancia de SQL
-     Server (local, Docker o Azure SQL).
-   - `Jwt:Key`: llave secreta para firmar los tokens (mínimo 32 caracteres).
-   - `Cors:OrigenesPermitidos`: agregar la URL desde la que se ejecutará el
-     frontend (por ejemplo `http://localhost:4200`).
+   - `ConnectionStrings:Default`: cadena de conexión al servidor Azure SQL de
+     pruebas `myservidorpruebas`, base de datos `dbturnos` (la contraseña se
+     proporciona por separado), por ejemplo:
+     `Server=tcp:myservidorpruebas.database.windows.net,1433;Initial Catalog=dbturnos;User ID=myservidorpruebas;Password=<proporcionada>;Encrypt=True;`
 
    > **Nota de seguridad**: no dejes credenciales reales de base de datos ni
    > llaves JWT en `appsettings.json` dentro del repositorio. Para uso local
    > usa `dotnet user-secrets`, y en producción usa variables de entorno o un
    > vault (Azure Key Vault, etc.).
 
-2. La base de datos y las tablas se crean automáticamente al iniciar la API
-   (`DbSeeder.Seed` ejecuta `Database.EnsureCreated()` y siembra las
-   sucursales de ejemplo), por lo que **no es necesario ejecutar migraciones
-   manualmente**; solo se requiere que la cadena de conexión apunte a una
-   base de datos SQL Server accesible.
+2. La base de datos de pruebas (`dbturnos`) ya está creada en Azure SQL con
+   sus tablas y datos por defecto. El script de creación se encuentra en
+   [`scriptBASEDATOS.sql`](./scriptBASEDATOS.sql), dentro de `turnos-docs`,
+   por si necesitas recrearla en otro servidor.
 
 ### 1.2 Restaurar, compilar y probar
 
@@ -69,8 +71,6 @@ La API queda disponible en la URL indicada en consola (por defecto algo como
 ### 1.4 Usuarios de prueba
 
 - **Cliente**: `POST /api/auth/token-cliente` con `{ "cedula": "..." }`.
-- **Empleado**: `POST /api/auth/login` con las credenciales de demostración
-  configuradas en `EmpleadoDemo` (`appsettings.json`).
 
 ## 2. Frontend (`turnos-frontend`)
 
@@ -114,8 +114,9 @@ desplegar en Azure Static Web Apps u otro hosting estático.
 
 ## 3. Orden recomendado de ejecución local
 
-1. Levantar SQL Server (local, contenedor Docker o Azure SQL) y actualizar la
-   cadena de conexión del backend.
+1. Configurar la cadena de conexión del backend con los datos del servidor de
+   pruebas en Azure SQL (`myservidorpruebas` / base de datos `dbturnos`,
+   contraseña proporcionada aparte).
 2. Ejecutar el backend (`dotnet run`) y confirmar que responde en Swagger.
 3. Actualizar `environment.ts` del frontend con la URL del backend si difiere
    de la URL por defecto.
@@ -128,7 +129,5 @@ desplegar en Azure Static Web Apps u otro hosting estático.
   pruebas unitarias.
 - [`STACK_TECNOLOGICO.md`](./STACK_TECNOLOGICO.md): detalle de tecnologías y
   versiones usadas en backend y frontend.
-- [`CONCURRENCIA_Y_ESCALABILIDAD.md`](./CONCURRENCIA_Y_ESCALABILIDAD.md):
-  análisis del manejo de concurrencia en la generación de turnos.
 - [`PRUEBA_TECNICA_AMARIS.md`](./PRUEBA_TECNICA_AMARIS.md): enunciado
   original de la prueba técnica.
