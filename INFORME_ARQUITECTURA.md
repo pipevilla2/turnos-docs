@@ -233,7 +233,7 @@ Claves de la solución:
 
 - **API stateless:** el estado (consecutivo) reside en la base de datos, por lo que se pueden ejecutar múltiples instancias del API sin coordinación adicional.
 - **I/O asíncrono:** todos los accesos a datos usan async/await, liberando hilos durante la espera de la base de datos y mejorando el throughput.
-- **Servicio de expiración en segundo plano:** opera de forma idempotente para no interferir cuando corran varias instancias.
+- **Servicio de expiración en segundo plano:** puede ejecutarse repetidamente sin generar cambios incorrectos cuando corren varias instancias.
 - **Pool de conexiones:** se mantiene el pooling de EF Core / SQL Server para soportar concurrencia sin agotar conexiones.
 
 ## 12\. Pruebas unitarias
@@ -271,3 +271,34 @@ Se implementaron pruebas unitarias tanto en el backend como en el frontend, cub
 | Cambiar estado (Atendido/Cancelado) | ✔️ (transiciones válidas e inválidas) | —   |
 | Autenticación | — (fuera del alcance de las pruebas actuales) | ✔️ (login y logout) |
 | Listado de turnos | ✔️ (a través de TurnoServiceTests) | ✔️ (filtro por cédula) |
+
+## 13. Procesamiento en segundo plano y evolución para producción
+
+Para esta prueba técnica se eligió un `BackgroundService` de ASP.NET Core,
+implementado mediante `ExpiracionTurnosService`, para ejecutar periódicamente
+la expiración de los turnos pendientes cuyo tiempo de activación ya terminó.
+El servicio corre dentro del backend, utiliza el contenedor de inyección de
+dependencias y crea un scope propio para acceder a los repositorios y a la
+base de datos. Esta alternativa es suficiente para demostrar la regla de
+negocio, mantener la solución sencilla y evitar dependencias adicionales.
+
+En un entorno productivo, especialmente con varias instancias del backend o
+con necesidades avanzadas de operación, se debería evaluar una solución de
+procesamiento programado más robusta. Algunas alternativas son:
+
+- **Hangfire**: permite programar y persistir trabajos, administrar reintentos,
+    consultar historiales y monitorear la ejecución desde un panel web. Requiere
+    configurar un almacenamiento compartido y controlar la ejecución distribuida
+    para evitar que varias instancias procesen el mismo trabajo indebidamente.
+- **Azure Functions con Timer Trigger**: ejecuta la tarea según una expresión
+    programada y delega la operación y el escalado a Azure. Es una opción
+    apropiada si se desea desacoplar la expiración del ciclo de vida del API,
+    aunque requiere configurar la función, la identidad de acceso y los recursos
+    de Azure correspondientes.
+
+La elección entre estas alternativas dependería del volumen de turnos, la
+frecuencia de ejecución requerida, las necesidades de reintento y monitoreo,
+la estrategia de despliegue y los costos operativos. En cualquiera de los
+casos, la operación de expiración debe poder ejecutarse repetidamente de forma
+segura ante ejecuciones concurrentes, de modo que procesar un turno más de una
+vez no produzca cambios incorrectos.
