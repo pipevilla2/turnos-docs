@@ -84,7 +84,7 @@ repositorios y reglas de negocio no necesitan cambios.
 - **karma-coverage** `2.2.x`: generación de cobertura.
 - **karma-jasmine-html-reporter** `2.1.x`: reporte HTML de resultados.
 
-Jest no está implementado actualmente en el frontend.
+
 
 ## Comunicación entre aplicaciones
 
