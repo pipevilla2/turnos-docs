@@ -1,4 +1,4 @@
-# Sistema de Agendamiento de Turnos — Amaris
+# Sistema de Agendamiento de Turnos Bancarios
 
 Prueba técnica: sistema de agendamiento de turnos bancarios compuesto por un
 backend en **ASP.NET Core 8 Web API** (`turnos-backend`) y un frontend en
