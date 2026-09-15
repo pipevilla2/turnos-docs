@@ -15,7 +15,7 @@ La solución está compuesta por un backend desarrollado con ASP.NET Core Web AP
 | Arquitectura | Clean Architecture por capas |
 | Autenticación | JWT Bearer |
 | Acceso a datos | Entity Framework Core 8 |
-| Base de datos | SQLite (seleccionada por practicidad y facilidad de ejecución) |
+| Base de datos | SQL Server (desplegada como Azure SQL Database) |
 | Documentación API | Swagger / OpenAPI mediante Swashbuckle |
 | Procesos en segundo plano | `BackgroundService` / Hosted Service |
 | Inyección de dependencias | Contenedor nativo de ASP.NET Core |
@@ -31,21 +31,22 @@ La solución está compuesta por un backend desarrollado con ASP.NET Core Web AP
 ### Paquetes principales del backend
 
 - `Microsoft.AspNetCore.Authentication.JwtBearer` `8.0.8`
-- `Microsoft.EntityFrameworkCore.Sqlite` `8.x`
-- `Microsoft.EntityFrameworkCore.Design` `8.x`
+- `Microsoft.EntityFrameworkCore.SqlServer` `8.0.8`
+- `Microsoft.EntityFrameworkCore.Design` `8.0.8`
 - `Swashbuckle.AspNetCore` `6.6.2`
 
 ### Base de datos y portabilidad
 
-Se utiliza **SQLite** porque es una base de datos embebida, no requiere instalar
-ni configurar un servidor externo y permite ejecutar la prueba técnica de forma
-rápida y sencilla. La aplicación conserva el acceso a datos aislado en
-`Turnos.Infrastructure` mediante Entity Framework Core.
+Se utiliza **SQL Server**, desplegada como **Azure SQL Database**
+(base de datos `dbturnos`), a través de `UseSqlServer(...)` en la
+configuración del `DbContext`. SQL Server ofrece soporte real de escrituras
+concurrentes, bloqueos a nivel de fila y transacciones, necesarios para
+generar los códigos de turno de forma segura bajo concurrencia.
 
-Para trabajar con **SQL Server** en un entorno productivo, el cambio principal
-consiste en instalar el proveedor `Microsoft.EntityFrameworkCore.SqlServer`,
-cambiar `UseSqlite(...)` por `UseSqlServer(...)` en la configuración del
-contexto y actualizar la cadena de conexión. Las entidades, servicios,
+El acceso a datos permanece aislado en `Turnos.Infrastructure` mediante
+Entity Framework Core, por lo que migrar a otro proveedor (por ejemplo
+PostgreSQL con `UseNpgsql(...)`) implicaría cambiar solo la configuración
+del `DbContext` y la cadena de conexión; las entidades, servicios,
 repositorios y reglas de negocio no necesitan cambios.
 
 ### Pruebas del backend
@@ -88,12 +89,8 @@ Jest no está implementado actualmente en el frontend.
 ## Comunicación entre aplicaciones
 
 ```text
-Angular 18 SPA -- HTTP/JSON + JWT --> ASP.NET Core 8 Web API -- EF Core --> SQLite
+Angular 18 SPA -- HTTP/JSON + JWT --> ASP.NET Core 8 Web API -- EF Core --> SQL Server (Azure SQL)
 ```
-
-SQLite es la opción actual para facilitar la ejecución local. El mismo backend
-puede utilizar SQL Server cambiando el proveedor de EF Core y la cadena de
-conexión en unas pocas líneas, sin modificar la lógica de negocio.
 
 ## Comandos principales
 
