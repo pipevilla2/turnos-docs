@@ -119,7 +119,7 @@ desplegar en Azure Static Web Apps u otro hosting estático.
 1. Ejecutar el backend (`dotnet run`) y confirmar que responde en Swagger.
 2. Actualizar `environment.ts` del frontend con la URL del backend si difiere
    de la URL por defecto.
-3. Ejecutar el frontend (`npm start`) y acceder a `http://localhost:4200`.
+3. Ejecutar el frontend (`npm start`) (`ng serve -o`) y acceder a `http://localhost:4200`.
 
 ## 4. Documentación adicional
 
