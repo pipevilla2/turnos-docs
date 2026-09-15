@@ -333,3 +333,125 @@ los componentes principales:
   JWT, con CORS y reglas de autorización para proteger los recursos.
 - **Disponibilidad**: la separación de responsabilidades entre frontend, API y
   base de datos facilita despliegues y mantenimiento más seguros y predecibles.
+
+## 11. Concurrencia y escalabilidad — Generación de turnos
+
+### 11.1 Requisito de la prueba
+
+> **Eficiencia y escalabilidad:** considerar la eficiencia y escalabilidad de la
+> solución, especialmente en términos de manejo de solicitudes concurrentes y
+> escalabilidad horizontal.
+
+El defecto rompía este requisito: la solución no era segura ante concurrencia ni
+apta para escalar horizontalmente (varias instancias del API agravarían el
+problema porque cada una mantenía su propio ciclo lectura-escritura).
+
+### 11.2 Solución adoptada — Incremento atómico en base de datos
+
+Se reemplazó el read-modify-write por una **única operación atómica con bloqueo**
+en la base de datos, ejecutada dentro de una transacción:
+
+```sql
+MERGE dbo.TurnosConsecutivos WITH (HOLDLOCK) AS target
+USING (SELECT @sucursalId AS SucursalId) AS src
+    ON target.SucursalId = src.SucursalId
+WHEN MATCHED THEN
+    UPDATE SET UltimoConsecutivo = target.UltimoConsecutivo + 1
+WHEN NOT MATCHED THEN
+    INSERT (SucursalId, UltimoConsecutivo) VALUES (src.SucursalId, 1);
+```
+
+Claves de la solución:
+
+- **`MERGE` (upsert):** en una sola sentencia crea la fila si no existe o la
+  incrementa si ya existe, cubriendo el primer turno de cada sucursal.
+- **`WITH (HOLDLOCK)`:** toma un bloqueo de rango sobre la fila de la sucursal y
+  lo mantiene hasta el `COMMIT`, serializando el incremento. Dos peticiones
+  concurrentes ya no pueden obtener el mismo valor.
+- **El índice único `UX_Turnos_CodigoTurno` se conserva** como garantía final: es
+  la última línea de defensa ante cualquier fallo de la aplicación.
+
+#### Por qué esta opción
+
+| Criterio | Beneficio |
+|----------|-----------|
+| Eficiencia | Una sola ida a la base de datos; sin transacciones largas ni contención global. |
+| Escalabilidad horizontal | El consecutivo vive en la base de datos, no en memoria del proceso: N instancias del API tras un balanceador comparten el mismo contador de forma consistente. |
+| Simplicidad | No requiere cambiar el modelo de datos ni introducir componentes externos. |
+
+### 11.3 Alternativas evaluadas
+
+| Opción | Descripción | Decisión |
+|--------|-------------|----------|
+| **Incremento atómico (MERGE + HOLDLOCK)** | Una sentencia con bloqueo de fila | **Elegida** |
+| Reintento ante clave duplicada | Capturar error 2601/2627 y reintentar | Complemento válido (defensa en profundidad) |
+| Concurrencia optimista (`rowversion`) | Token de versión + retry | Válida, más código |
+| Transacción `Serializable` completa | Aísla lectura + inserción del turno | Válida, mayor contención |
+| SQL Sequence por sucursal | `NEXT VALUE FOR` | Válida, cambia el modelo de datos |
+
+### 11.4 Consideraciones de escalabilidad horizontal
+
+- **API stateless:** el estado (consecutivo) reside en la base de datos, por lo
+  que se pueden ejecutar múltiples instancias del API sin coordinación adicional.
+- **I/O asíncrono:** todos los accesos a datos usan `async/await`, liberando
+  hilos durante la espera de la base de datos y mejorando el throughput.
+- **Servicio de expiración en segundo plano:** opera de forma idempotente para no
+  interferir cuando corran varias instancias.
+- **Pool de conexiones:** se mantiene el pooling de EF Core / SQL Server para
+  soportar concurrencia sin agotar conexiones.
+
+## 12. Pruebas unitarias
+
+Se implementaron pruebas unitarias tanto en el backend como en el frontend,
+cubriendo las reglas de negocio y los flujos principales de la aplicación
+(creación de turnos, activación, límites diarios y consumo de la API).
+
+### 12.1 Backend
+
+- **Framework**: `xUnit`, con `Moq` para simular los repositorios
+  (`ITurnoRepository`, `ISucursalRepository`) y `FluentAssertions` para
+  aserciones más legibles.
+- **Ubicación**: proyecto `Turnos.Tests`.
+- `TurnoEntityTests.cs`: valida las reglas puras de la entidad `Turno`, por
+  ejemplo que un turno pendiente vencido se marque `Expirado`
+  (`IntentarExpirar_SiVencioYSigueEnPendiente_DeberiaMarcarExpirado`) y que no
+  se pueda cancelar un turno ya atendido
+  (`Cancelar_CuandoYaFueAtendido_DeberiaLanzarExcepcion`).
+- `TurnoServiceTests.cs`: valida los casos de uso orquestados por
+  `TurnoService`, entre ellos:
+  - Creación de un turno válido con estado `Pendiente` y código consecutivo.
+  - Generación del siguiente código de turno a partir del consecutivo de la
+    sucursal.
+  - Rechazo al intentar crear un sexto turno el mismo día para la misma
+    cédula (límite diario).
+  - Rechazo al crear un turno para una sucursal inexistente o inactiva.
+  - Activación de un turno dentro del tiempo límite.
+  - Cambios de estado válidos e inválidos (por ejemplo, no se puede marcar
+    `Atendido` un turno que sigue `Pendiente`).
+
+### 12.2 Frontend
+
+- **Framework**: `Jasmine` como framework de pruebas y `Karma` como test
+  runner (generado por Angular CLI), ejecutando en `ChromeHeadless`.
+- `auth.service.spec.ts`: valida que el servicio autentique al cliente y
+  guarde la sesión, y que `logout` limpie la sesión correctamente.
+- `turno.service.spec.ts`: valida las peticiones HTTP del servicio de turnos
+  usando `HttpTestingController`, simulando la creación de un turno
+  (`POST /turnos`), su activación (`POST /turnos/{id}/activar`) y el listado
+  filtrado por cédula.
+- `agendar-turno.component.spec.ts`: valida el componente de agendamiento,
+  incluyendo la carga de sucursales activas al iniciar, el mensaje de error
+  cuando se agenda sin seleccionar sucursal, y el formato del cronómetro de
+  15 minutos (`formatoTiempo`).
+- `app.component.spec.ts`: prueba básica de creación de la aplicación.
+
+### 12.3 Cobertura de las principales funcionalidades
+
+| Funcionalidad | Backend | Frontend |
+|---|---|---|
+| Crear turno | ✔️ (válido, límite diario, sucursal inexistente/inactiva) | ✔️ (servicio y componente) |
+| Activar turno | ✔️ (dentro del tiempo límite) | ✔️ (servicio) |
+| Expirar turno | ✔️ (entidad `Turno`) | — (regla protegida solo en backend) |
+| Cambiar estado (Atendido/Cancelado) | ✔️ (transiciones válidas e inválidas) | — |
+| Autenticación | — (fuera del alcance de las pruebas actuales) | ✔️ (login y logout) |
+| Listado de turnos | ✔️ (a través de `TurnoServiceTests`) | ✔️ (filtro por cédula) |

@@ -1,33 +1,6 @@
 # Concurrencia y Escalabilidad — Generación de Turnos
 
-## 1. Problema detectado
-
-Al agendar turnos de forma concurrente en la misma sucursal se producía el error:
-
-> Cannot insert duplicate key row in object 'dbo.Turnos' with unique index
-> 'UX_Turnos_CodigoTurno'. The duplicate key value is (S02-001).
-
-### Causa raíz
-
-La generación del consecutivo (`TurnoRepository.GetNextConsecutivoAsync`) usaba un
-patrón **read-modify-write** sin control de concurrencia:
-
-1. Leía `UltimoConsecutivo`.
-2. Lo incrementaba en memoria.
-3. Lo guardaba con `SaveChangesAsync`.
-
-Bajo carga concurrente, dos peticiones leían el mismo valor, generaban el mismo
-código (`S02-001`) y la segunda inserción violaba el índice único
-`UX_Turnos_CodigoTurno`.
-
-```
-Petición A: lee 0 ─┐
-Petición B: lee 0 ─┤ (ambas leen el mismo valor)
-Petición A: 0+1=1 → S02-001 → INSERT OK
-Petición B: 0+1=1 → S02-001 → INSERT ERROR (clave duplicada)
-```
-
-## 2. Requisito de la prueba
+## 1. Requisito de la prueba
 
 > **Eficiencia y escalabilidad:** considerar la eficiencia y escalabilidad de la
 > solución, especialmente en términos de manejo de solicitudes concurrentes y
@@ -37,7 +10,7 @@ El defecto rompía este requisito: la solución no era segura ante concurrencia 
 apta para escalar horizontalmente (varias instancias del API agravarían el
 problema porque cada una mantenía su propio ciclo lectura-escritura).
 
-## 3. Solución adoptada — Incremento atómico en base de datos
+## 2. Solución adoptada — Incremento atómico en base de datos
 
 Se reemplazó el read-modify-write por una **única operación atómica con bloqueo**
 en la base de datos, ejecutada dentro de una transacción:
@@ -70,7 +43,7 @@ Claves de la solución:
 | Escalabilidad horizontal | El consecutivo vive en la base de datos, no en memoria del proceso: N instancias del API tras un balanceador comparten el mismo contador de forma consistente. |
 | Simplicidad | No requiere cambiar el modelo de datos ni introducir componentes externos. |
 
-## 4. Alternativas evaluadas
+## 3. Alternativas evaluadas
 
 | Opción | Descripción | Decisión |
 |--------|-------------|----------|
@@ -80,7 +53,7 @@ Claves de la solución:
 | Transacción `Serializable` completa | Aísla lectura + inserción del turno | Válida, mayor contención |
 | SQL Sequence por sucursal | `NEXT VALUE FOR` | Válida, cambia el modelo de datos |
 
-## 5. Consideraciones de escalabilidad horizontal
+## 4. Consideraciones de escalabilidad horizontal
 
 - **API stateless:** el estado (consecutivo) reside en la base de datos, por lo
   que se pueden ejecutar múltiples instancias del API sin coordinación adicional.
@@ -90,17 +63,3 @@ Claves de la solución:
   interferir cuando corran varias instancias.
 - **Pool de conexiones:** se mantiene el pooling de EF Core / SQL Server para
   soportar concurrencia sin agotar conexiones.
-
-## 6. Nota sobre el límite diario por cédula
-
-La validación de "máximo 5 turnos por cédula al día" también depende de un conteo
-previo (`CountByCedulaBetweenAsync`). Bajo concurrencia extrema podría superarse
-el límite por una unidad. Si se requiere estricta exactitud, se puede reforzar
-con la misma estrategia (transacción con bloqueo o índice/constraint de apoyo).
-
-## 7. Pruebas recomendadas
-
-- **Prueba de concurrencia:** N solicitudes simultáneas a la misma sucursal deben
-  producir N códigos distintos y ninguna violación de índice único.
-- **Prueba de límite:** validar el tope de turnos diarios por cédula bajo
-  ejecución concurrente.
