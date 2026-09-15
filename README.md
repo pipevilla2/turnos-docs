@@ -7,7 +7,8 @@ backend en **ASP.NET Core 8 Web API** (`turnos-backend`) y un frontend en
 gráficas de la arquitectura, revisa
 [`INFORME_ARQUITECTURA.pdf`](./INFORME_ARQUITECTURA.pdf), que sí las incluye
 y debe leerse junto con el `.md`.
-
+[`MANUAL_USUARIO.md`](./MANUAL_USUARIO.md): instrucciones básicas para
+   ingresar, agendar, activar y consultar turnos.
 ## Repositorios / carpetas del proyecto
 
 | Carpeta | Contenido | Repositorio en GitHub |
@@ -123,6 +124,8 @@ desplegar en Azure Static Web Apps u otro hosting estático.
 
 ## 4. Documentación adicional
 
+- [`MANUAL_USUARIO.md`](./MANUAL_USUARIO.md): instrucciones básicas para
+   ingresar, agendar, activar y consultar turnos.
 - [`INFORME_ARQUITECTURA.md`](./INFORME_ARQUITECTURA.md): arquitectura,
   patrones de diseño, modelo de datos, seguridad, despliegue en Azure y
   pruebas unitarias.
