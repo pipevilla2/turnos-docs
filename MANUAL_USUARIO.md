@@ -4,6 +4,8 @@
 
 Este manual explica cómo solicitar y consultar un turno para ser atendido en una sucursal bancaria.
 
+Las capturas de este manual fueron tomadas desde la aplicación en funcionamiento y sirven como referencia visual.
+
 ## 1. Acceder al sistema
 
 1. Abra la aplicación desde el navegador.
@@ -12,6 +14,8 @@ Este manual explica cómo solicitar y consultar un turno para ser atendido en un
 4. Seleccione **Validar cédula**.
 
 Si la cédula es válida, el sistema mostrará el menú principal y la cédula identificada.
+
+![Pantalla de inicio de sesión](./img/manual/01-inicio-sesion.png)
 
 ### Controles disponibles al ingresar la cédula
 
@@ -29,6 +33,8 @@ Después de validar la cédula, estarán disponibles estas opciones:
 
 La cédula también se muestra en las pantallas de agendamiento y consulta de turnos.
 
+![Menú principal](./img/manual/02-menu-principal.png)
+
 ## 3. Agendar un turno
 
 1. Seleccione **Agendar turno**.
@@ -44,6 +50,8 @@ Al crear el turno, se mostrarán:
 - El tiempo disponible para activarlo.
 
 Si no selecciona una sucursal, el sistema solicitará que la elija antes de continuar.
+
+![Pantalla para agendar un turno](./img/manual/03-agendar-turno.png)
 
 ## 4. Activar el turno en la sucursal
 
@@ -68,6 +76,8 @@ Si el tiempo termina, el turno pasa a estado **Expirado** y deberá solicitar un
 Si no tiene turnos registrados, aparecerá el mensaje:
 
 > Aún no tienes turnos agendados.
+
+![Pantalla Mis turnos](./img/manual/04-mis-turnos.png)
 
 ## 6. Estados de un turno
 
